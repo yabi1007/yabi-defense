@@ -3,56 +3,172 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Yabi Defense - 자동 공격 범위 테스트</title>
+  <title>Yabi Defense - 검기 공격 테스트</title>
   <style>
     * { box-sizing: border-box; }
     body {
       margin: 0;
       min-height: 100vh;
-      display: grid;
-      place-items: center;
-      background: #1d2230;
-      color: white;
+      background: #171c28;
+      color: #fff;
       font-family: Arial, "Noto Sans KR", sans-serif;
     }
-    .app { width: min(960px, 100%); padding: 20px; }
-    h1 { margin: 0 0 10px; font-size: 22px; }
-    p { margin: 0 0 14px; color: #cbd2e3; line-height: 1.5; }
+    .app {
+      width: min(1180px, 100%);
+      margin: 0 auto;
+      padding: 18px;
+    }
+    h1 { margin: 0 0 8px; font-size: 23px; }
+    .description {
+      margin: 0 0 14px;
+      line-height: 1.55;
+      color: #cbd3e6;
+    }
     .canvas-wrap {
       overflow: hidden;
-      border: 1px solid #46506a;
+      border: 1px solid #45506b;
       border-radius: 14px;
       background: #eef7ff;
+      box-shadow: 0 16px 38px rgba(0,0,0,.28);
     }
     canvas {
       display: block;
       width: 100%;
       height: auto;
-      cursor: pointer;
       touch-action: none;
+      cursor: grab;
     }
+    canvas:active { cursor: grabbing; }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0;
+    }
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 15px;
+      background: #ff9d35;
+      color: #21170d;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    button.secondary {
+      background: #3b465f;
+      color: #fff;
+    }
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(170px, 1fr));
+      gap: 10px;
+    }
+    label {
+      display: grid;
+      gap: 6px;
+      padding: 10px;
+      border-radius: 10px;
+      background: #262d3e;
+      color: #dce4f6;
+      font-size: 13px;
+    }
+    input[type="range"] { width: 100%; }
+    .value { color: #fff; font-weight: 800; }
     .status {
       margin-top: 12px;
-      padding: 12px;
-      border-radius: 10px;
-      background: #2a3142;
-      color: #ffe3a3;
+      min-height: 24px;
+      color: #ffd58d;
+      font-size: 14px;
+    }
+    @media (max-width: 850px) {
+      .controls { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 520px) {
+      .controls { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
   <main class="app">
-    <h1>Yabi Defense 자동 공격 테스트</h1>
-    <p>
-      빨간 몬스터를 드래그해 공격 범위 안팎으로 이동해보세요.
-      몬스터가 범위 안에 있을 때만 불정령이 자동으로 회전 공격합니다.
+    <h1>Yabi Defense 검기 공격 테스트</h1>
+    <p class="description">
+      몬스터를 드래그해 어느 방향에서든 테스트하세요.
+      불 정령은 적 방향으로 칼을 짧게 휘두른 뒤 초승달 검기를 발사합니다.
     </p>
 
     <div class="canvas-wrap">
-      <canvas id="gameCanvas" width="900" height="560"></canvas>
+      <canvas id="gameCanvas" width="1000" height="610"></canvas>
     </div>
 
-    <div id="status" class="status">이미지를 불러오는 중...</div>
+    <div class="toolbar">
+      <button id="attackBtn">공격 테스트</button>
+      <button id="autoBtn" class="secondary">자동 공격: 켜짐</button>
+      <button id="resetBtn" class="secondary">기본값 복원</button>
+    </div>
+
+    <section class="controls">
+      <label>
+        손 위치 X
+        <input id="socketX" type="range" min="-80" max="100" value="50" />
+        <span class="value" id="socketXValue">50</span>
+      </label>
+
+      <label>
+        손 위치 Y
+        <input id="socketY" type="range" min="-80" max="100" value="32" />
+        <span class="value" id="socketYValue">32</span>
+      </label>
+
+      <label>
+        칼 크기
+        <input id="weaponScale" type="range" min="50" max="450" value="375" />
+        <span class="value" id="weaponScaleValue">375%</span>
+      </label>
+
+      <label>
+        칼 거리
+        <input id="weaponDistance" type="range" min="-30" max="60" value="2" />
+        <span class="value" id="weaponDistanceValue">2</span>
+      </label>
+
+      <label>
+        휘두름 각도
+        <input id="swingAngle" type="range" min="30" max="160" value="95" />
+        <span class="value" id="swingAngleValue">95°</span>
+      </label>
+
+      <label>
+        휘두름 시간
+        <input id="swingDuration" type="range" min="80" max="500" value="190" />
+        <span class="value" id="swingDurationValue">190ms</span>
+      </label>
+
+      <label>
+        검기 크기
+        <input id="waveScale" type="range" min="40" max="240" value="110" />
+        <span class="value" id="waveScaleValue">110%</span>
+      </label>
+
+      <label>
+        검기 속도
+        <input id="waveSpeed" type="range" min="200" max="1200" value="650" />
+        <span class="value" id="waveSpeedValue">650px/s</span>
+      </label>
+
+      <label>
+        공격 사거리
+        <input id="attackRange" type="range" min="120" max="500" value="340" />
+        <span class="value" id="attackRangeValue">340px</span>
+      </label>
+
+      <label>
+        공격 쿨다운
+        <input id="cooldown" type="range" min="300" max="2000" value="900" />
+        <span class="value" id="cooldownValue">900ms</span>
+      </label>
+    </section>
+
+    <div id="status" class="status">PNG 이미지를 불러오는 중...</div>
   </main>
 
   <script src="game.js"></script>
