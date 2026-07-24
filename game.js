@@ -4,26 +4,6 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const statusEl = document.getElementById('status');
 
-const controls = {
-  socketX: document.getElementById('socketX'),
-  socketY: document.getElementById('socketY'),
-  weaponScale: document.getElementById('weaponScale'),
-  weaponDistance: document.getElementById('weaponDistance'),
-};
-
-const values = {
-  socketX: document.getElementById('socketXValue'),
-  socketY: document.getElementById('socketYValue'),
-  weaponScale: document.getElementById('weaponScaleValue'),
-  weaponDistance: document.getElementById('weaponDistanceValue'),
-};
-
-/*
-  현재 프로젝트 폴더 구조 기준 경로입니다.
-
-  assets/images/units/base/fire/spirit_t1.png
-  assets/images/units/weapons/sword/sword_t1.png
-*/
 const ASSET_PATHS = {
   spirit: 'assets/images/units/base/fire/spirit_t1.png',
   sword: 'assets/images/units/weapons/sword/sword_t1.png',
@@ -36,83 +16,122 @@ spiritImage.src = ASSET_PATHS.spirit;
 swordImage.src = ASSET_PATHS.sword;
 
 const unit = {
-  x: canvas.width / 2,
-  y: canvas.height / 2 + 30,
+  x: 450,
+  y: 310,
 
-  // 캐릭터를 화면에 그릴 크기입니다.
   bodyWidth: 180,
   bodyHeight: 180,
 
-  // 몸 중심을 기준으로 한 손 소켓 좌표입니다.
-  socketX: Number(controls.socketX.value),
-  socketY: Number(controls.socketY.value),
+  // 사용자가 확정한 값
+  socketX: 50,
+  socketY: 32,
+  weaponScale: 2.5,
 
-  // 48x20 원본 검 이미지를 확대해서 표시합니다.
-  weaponScale: Number(controls.weaponScale.value) / 100,
-  weaponDistance: Number(controls.weaponDistance.value),
+  attackRange: 180,
+  attackCooldown: 0.9,
+  attackDuration: 0.32,
+
+  cooldownTimer: 0,
+  attackTimer: 0,
+  isAttacking: false,
 };
 
-const pointer = {
-  x: canvas.width * 0.75,
-  y: canvas.height * 0.45,
+const monster = {
+  x: 720,
+  y: 310,
+  radius: 34,
+  dragging: false,
+  alive: true,
 };
 
+let previousTime = performance.now();
 let loadedCount = 0;
-let loadFailed = false;
 
-function handleImageLoaded() {
+function onLoaded() {
   loadedCount += 1;
-
   if (loadedCount === 2) {
-    statusEl.textContent = '이미지 로드 완료. 마우스를 움직여 칼 방향을 확인하세요.';
+    statusEl.textContent =
+      '준비 완료. 몬스터를 드래그해 공격 범위 안으로 넣어보세요.';
   }
 }
 
-function handleImageError(event) {
-  loadFailed = true;
-  const failedPath = event.currentTarget.src;
+function onError(event) {
   statusEl.textContent =
-    '이미지를 찾지 못했습니다. 파일명과 assets 폴더 위치를 확인하세요: ' +
-    failedPath;
+    '이미지를 찾지 못했습니다. 경로를 확인하세요: ' +
+    event.currentTarget.src;
 }
 
-spiritImage.addEventListener('load', handleImageLoaded);
-swordImage.addEventListener('load', handleImageLoaded);
-spiritImage.addEventListener('error', handleImageError);
-swordImage.addEventListener('error', handleImageError);
+spiritImage.addEventListener('load', onLoaded);
+swordImage.addEventListener('load', onLoaded);
+spiritImage.addEventListener('error', onError);
+swordImage.addEventListener('error', onError);
 
-function updatePointer(clientX, clientY) {
-  const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
-
-  pointer.x = (clientX - rect.left) * scaleX;
-  pointer.y = (clientY - rect.top) * scaleY;
+function distance(ax, ay, bx, by) {
+  return Math.hypot(bx - ax, by - ay);
 }
 
-canvas.addEventListener('pointermove', (event) => {
-  updatePointer(event.clientX, event.clientY);
-});
+function isMonsterInRange() {
+  if (!monster.alive) return false;
 
-canvas.addEventListener('pointerdown', (event) => {
-  canvas.setPointerCapture(event.pointerId);
-  updatePointer(event.clientX, event.clientY);
-});
-
-function bindRange(controlName, formatter = (value) => value) {
-  controls[controlName].addEventListener('input', () => {
-    const numericValue = Number(controls[controlName].value);
-    unit[controlName] =
-      controlName === 'weaponScale' ? numericValue / 100 : numericValue;
-
-    values[controlName].textContent = formatter(numericValue);
-  });
+  return (
+    distance(unit.x, unit.y, monster.x, monster.y) <=
+    unit.attackRange + monster.radius
+  );
 }
 
-bindRange('socketX');
-bindRange('socketY');
-bindRange('weaponScale', (value) => `${value}%`);
-bindRange('weaponDistance');
+function startAttack() {
+  if (unit.isAttacking) return;
+
+  unit.isAttacking = true;
+  unit.attackTimer = 0;
+  unit.cooldownTimer = unit.attackCooldown;
+}
+
+function update(deltaTime) {
+  if (unit.cooldownTimer > 0) {
+    unit.cooldownTimer -= deltaTime;
+  }
+
+  if (unit.isAttacking) {
+    unit.attackTimer += deltaTime;
+
+    if (unit.attackTimer >= unit.attackDuration) {
+      unit.isAttacking = false;
+      unit.attackTimer = 0;
+    }
+  }
+
+  // 핵심: 몬스터가 범위 안에 있을 때만 자동 공격
+  if (
+    isMonsterInRange() &&
+    !unit.isAttacking &&
+    unit.cooldownTimer <= 0
+  ) {
+    startAttack();
+  }
+}
+
+function getAttackProgress() {
+  if (!unit.isAttacking) return 0;
+
+  const rawProgress = Math.min(
+    unit.attackTimer / unit.attackDuration,
+    1
+  );
+
+  // 처음은 빠르고 마지막은 부드럽게 감속
+  return 1 - Math.pow(1 - rawProgress, 3);
+}
+
+function getWeaponAngle() {
+  const baseAngle = Math.PI / 4;
+
+  if (!unit.isAttacking) {
+    return baseAngle;
+  }
+
+  return baseAngle + getAttackProgress() * Math.PI * 2;
+}
 
 function drawBackground() {
   const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
@@ -124,81 +143,91 @@ function drawBackground() {
 
   ctx.fillStyle = '#c9dda4';
   ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
+}
 
-  ctx.strokeStyle = 'rgba(66, 94, 115, 0.12)';
-  ctx.lineWidth = 1;
+function drawAttackRange() {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(unit.x, unit.y, unit.attackRange, 0, Math.PI * 2);
 
-  for (let x = 0; x <= canvas.width; x += 40) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, canvas.height);
-    ctx.stroke();
-  }
+  ctx.fillStyle = isMonsterInRange()
+    ? 'rgba(255, 126, 67, 0.10)'
+    : 'rgba(70, 130, 180, 0.08)';
 
-  for (let y = 0; y <= canvas.height; y += 40) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(canvas.width, y);
-    ctx.stroke();
-  }
+  ctx.strokeStyle = isMonsterInRange()
+    ? 'rgba(255, 92, 50, 0.65)'
+    : 'rgba(60, 110, 170, 0.45)';
+
+  ctx.setLineDash([8, 8]);
+  ctx.lineWidth = 2;
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawSpirit() {
-  if (!spiritImage.complete || spiritImage.naturalWidth === 0) {
-    drawMissingAssetPlaceholder(
+  if (spiritImage.complete && spiritImage.naturalWidth > 0) {
+    ctx.drawImage(
+      spiritImage,
       unit.x - unit.bodyWidth / 2,
       unit.y - unit.bodyHeight / 2,
       unit.bodyWidth,
-      unit.bodyHeight,
-      '불정령'
+      unit.bodyHeight
     );
-    return;
+  } else {
+    ctx.fillStyle = '#ff8b42';
+    ctx.beginPath();
+    ctx.arc(unit.x, unit.y, 70, 0, Math.PI * 2);
+    ctx.fill();
   }
-
-  ctx.drawImage(
-    spiritImage,
-    unit.x - unit.bodyWidth / 2,
-    unit.y - unit.bodyHeight / 2,
-    unit.bodyWidth,
-    unit.bodyHeight
-  );
 }
 
-function getSocketPosition() {
-  return {
-    x: unit.x + unit.socketX,
-    y: unit.y + unit.socketY,
-  };
+function drawSlashEffect(socketX, socketY, angle) {
+  if (!unit.isAttacking) return;
+
+  const progress = getAttackProgress();
+  const alpha = Math.sin(progress * Math.PI) * 0.55;
+
+  ctx.save();
+  ctx.translate(socketX, socketY);
+  ctx.rotate(angle);
+
+  ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+  ctx.lineWidth = 14;
+  ctx.lineCap = 'round';
+
+  ctx.beginPath();
+  ctx.arc(0, 0, 92, -1.25, 0.2);
+  ctx.stroke();
+
+  ctx.restore();
 }
 
 function drawWeapon() {
-  const socket = getSocketPosition();
-  const angle = Math.atan2(pointer.y - socket.y, pointer.x - socket.x);
+  const socketX = unit.x + unit.socketX;
+  const socketY = unit.y + unit.socketY;
+  const angle = getWeaponAngle();
 
-  /*
-    검 PNG는 세로형(48x20)입니다.
-    화면에서 마우스 방향을 향하게 하기 위해 기본 이미지 방향에 90도를 더합니다.
-    검의 회전축은 이미지 하단 중앙, 즉 손잡이 끝으로 설정합니다.
-  */
   const weaponHeight = 48 * unit.weaponScale;
   const weaponWidth = 20 * unit.weaponScale;
 
+  drawSlashEffect(socketX, socketY, angle);
+
   ctx.save();
-  ctx.translate(socket.x, socket.y);
+  ctx.translate(socketX, socketY);
   ctx.rotate(angle + Math.PI / 2);
 
-  // 손에서 검이 조금 떨어져 보일 때 조절하는 거리입니다.
-  ctx.translate(0, -unit.weaponDistance);
-
-  if (!swordImage.complete || swordImage.naturalWidth === 0) {
-    ctx.fillStyle = '#c8d0dc';
-    ctx.strokeStyle = '#46506a';
-    ctx.lineWidth = 2;
-    ctx.fillRect(-weaponWidth / 2, -weaponHeight, weaponWidth, weaponHeight);
-    ctx.strokeRect(-weaponWidth / 2, -weaponHeight, weaponWidth, weaponHeight);
-  } else {
+  if (swordImage.complete && swordImage.naturalWidth > 0) {
     ctx.drawImage(
       swordImage,
+      -weaponWidth / 2,
+      -weaponHeight,
+      weaponWidth,
+      weaponHeight
+    );
+  } else {
+    ctx.fillStyle = '#d9dee8';
+    ctx.fillRect(
       -weaponWidth / 2,
       -weaponHeight,
       weaponWidth,
@@ -207,100 +236,108 @@ function drawWeapon() {
   }
 
   ctx.restore();
-
-  drawSocketGuide(socket, angle);
 }
 
-function drawSocketGuide(socket, angle) {
+function drawMonster() {
   ctx.save();
 
-  ctx.strokeStyle = 'rgba(255, 70, 70, 0.55)';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([5, 5]);
-
+  ctx.fillStyle = isMonsterInRange() ? '#ef5350' : '#ba3f3f';
   ctx.beginPath();
-  ctx.arc(socket.x, socket.y, 8, 0, Math.PI * 2);
-  ctx.stroke();
+  ctx.arc(monster.x, monster.y, monster.radius, 0, Math.PI * 2);
+  ctx.fill();
 
+  ctx.fillStyle = '#ffffff';
   ctx.beginPath();
-  ctx.moveTo(socket.x, socket.y);
-  ctx.lineTo(
-    socket.x + Math.cos(angle) * 55,
-    socket.y + Math.sin(angle) * 55
-  );
-  ctx.stroke();
+  ctx.arc(monster.x - 11, monster.y - 6, 6, 0, Math.PI * 2);
+  ctx.arc(monster.x + 11, monster.y - 6, 6, 0, Math.PI * 2);
+  ctx.fill();
 
-  ctx.setLineDash([]);
-  ctx.fillStyle = '#c53d3d';
-  ctx.font = '13px Arial';
-  ctx.fillText('손 소켓', socket.x + 12, socket.y - 10);
-
-  ctx.restore();
-}
-
-function drawPointerGuide() {
-  ctx.save();
-  ctx.strokeStyle = 'rgba(45, 91, 160, 0.5)';
-  ctx.lineWidth = 2;
-
+  ctx.fillStyle = '#222222';
   ctx.beginPath();
-  ctx.arc(pointer.x, pointer.y, 10, 0, Math.PI * 2);
-  ctx.stroke();
+  ctx.arc(monster.x - 11, monster.y - 6, 2.5, 0, Math.PI * 2);
+  ctx.arc(monster.x + 11, monster.y - 6, 2.5, 0, Math.PI * 2);
+  ctx.fill();
 
-  ctx.beginPath();
-  ctx.moveTo(pointer.x - 14, pointer.y);
-  ctx.lineTo(pointer.x + 14, pointer.y);
-  ctx.moveTo(pointer.x, pointer.y - 14);
-  ctx.lineTo(pointer.x, pointer.y + 14);
-  ctx.stroke();
+  ctx.fillStyle = '#4a1e1e';
+  ctx.fillRect(monster.x - 12, monster.y + 10, 24, 5);
 
-  ctx.restore();
-}
-
-function drawMissingAssetPlaceholder(x, y, width, height, label) {
-  ctx.save();
-  ctx.fillStyle = '#ffe4e4';
-  ctx.strokeStyle = '#d75c5c';
-  ctx.lineWidth = 3;
-  ctx.fillRect(x, y, width, height);
-  ctx.strokeRect(x, y, width, height);
-
-  ctx.fillStyle = '#8f3131';
-  ctx.font = 'bold 18px Arial';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(label + ' 이미지 없음', x + width / 2, y + height / 2);
   ctx.restore();
 }
 
 function drawInfo() {
-  const socket = getSocketPosition();
+  const inRange = isMonsterInRange();
 
   ctx.save();
-  ctx.fillStyle = 'rgba(20, 29, 45, 0.78)';
-  ctx.fillRect(18, 18, 270, 88);
+  ctx.fillStyle = 'rgba(20,29,45,0.82)';
+  ctx.fillRect(18, 18, 310, 100);
 
   ctx.fillStyle = '#ffffff';
   ctx.font = '14px Arial';
-  ctx.fillText(`소켓 X: ${unit.socketX}`, 32, 45);
-  ctx.fillText(`소켓 Y: ${unit.socketY}`, 32, 67);
-  ctx.fillText(`칼 배율: ${Math.round(unit.weaponScale * 100)}%`, 150, 45);
+  ctx.fillText(`몬스터 감지: ${inRange ? '범위 안' : '범위 밖'}`, 32, 45);
   ctx.fillText(
-    `소켓 좌표: ${Math.round(socket.x)}, ${Math.round(socket.y)}`,
+    `공격 상태: ${unit.isAttacking ? '회전 공격 중' : '대기'}`,
     32,
-    89
+    68
   );
+  ctx.fillText(`공격 범위: ${unit.attackRange}px`, 32, 91);
+
   ctx.restore();
 }
 
-function gameLoop() {
+function render() {
   drawBackground();
+  drawAttackRange();
   drawSpirit();
   drawWeapon();
-  drawPointerGuide();
+  drawMonster();
   drawInfo();
+}
+
+function gameLoop(currentTime) {
+  const deltaTime = Math.min((currentTime - previousTime) / 1000, 0.05);
+  previousTime = currentTime;
+
+  update(deltaTime);
+  render();
 
   requestAnimationFrame(gameLoop);
 }
 
-gameLoop();
+function getCanvasPointer(event) {
+  const rect = canvas.getBoundingClientRect();
+
+  return {
+    x: (event.clientX - rect.left) * (canvas.width / rect.width),
+    y: (event.clientY - rect.top) * (canvas.height / rect.height),
+  };
+}
+
+canvas.addEventListener('pointerdown', (event) => {
+  const pointer = getCanvasPointer(event);
+
+  if (
+    distance(pointer.x, pointer.y, monster.x, monster.y) <=
+    monster.radius + 15
+  ) {
+    monster.dragging = true;
+    canvas.setPointerCapture(event.pointerId);
+  }
+});
+
+canvas.addEventListener('pointermove', (event) => {
+  if (!monster.dragging) return;
+
+  const pointer = getCanvasPointer(event);
+  monster.x = pointer.x;
+  monster.y = pointer.y;
+});
+
+canvas.addEventListener('pointerup', () => {
+  monster.dragging = false;
+});
+
+canvas.addEventListener('pointercancel', () => {
+  monster.dragging = false;
+});
+
+requestAnimationFrame(gameLoop);
