@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Yabi Defense - 무기 소켓 테스트</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #1d2230;
+      color: #ffffff;
+      font-family: Arial, "Noto Sans KR", sans-serif;
+    }
+
+    .app {
+      width: min(960px, 100%);
+      padding: 20px;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: 22px;
+    }
+
+    .description {
+      margin: 0 0 14px;
+      color: #cbd2e3;
+      line-height: 1.5;
+    }
+
+    .canvas-wrap {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid #46506a;
+      border-radius: 14px;
+      background: #eef7ff;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      padding: 10px;
+      border-radius: 10px;
+      background: #2a3142;
+      font-size: 13px;
+      color: #dce3f4;
+    }
+
+    input[type="range"] {
+      width: 100%;
+    }
+
+    .value {
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .status {
+      margin-top: 12px;
+      min-height: 22px;
+      color: #ffd88b;
+      font-size: 14px;
+    }
+
+    @media (max-width: 700px) {
+      .controls {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <h1>Yabi Defense 무기 소켓 테스트</h1>
+    <p class="description">
+      마우스나 손가락을 움직이면 칼이 해당 방향을 바라봅니다.
+      아래 슬라이더로 손 위치와 칼 크기를 조절할 수 있습니다.
+    </p>
+
+    <div class="canvas-wrap">
+      <canvas id="gameCanvas" width="900" height="560"></canvas>
+    </div>
+
+    <section class="controls">
+      <label>
+        손 위치 X
+        <input id="socketX" type="range" min="-50" max="50" value="22" />
+        <span class="value" id="socketXValue">22</span>
+      </label>
+
+      <label>
+        손 위치 Y
+        <input id="socketY" type="range" min="-50" max="50" value="8" />
+        <span class="value" id="socketYValue">8</span>
+      </label>
+
+      <label>
+        칼 크기
+        <input id="weaponScale" type="range" min="40" max="250" value="140" />
+        <span class="value" id="weaponScaleValue">140%</span>
+      </label>
+
+      <label>
+        칼 거리
+        <input id="weaponDistance" type="range" min="-10" max="40" value="2" />
+        <span class="value" id="weaponDistanceValue">2</span>
+      </label>
+    </section>
+
+    <div id="status" class="status">이미지를 불러오는 중...</div>
+  </main>
+
+  <script src="game.js"></script>
+</body>
+</html>
