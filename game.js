@@ -45,8 +45,8 @@ swordImage.src = ASSET_PATHS.sword;
 const unit = {
   x: 430,
   y: 335,
-  bodyWidth: 190,
-  bodyHeight: 190,
+  bodyWidth: 150,
+  bodyHeight: 150,
   socketX: 55,
   socketY: 33,
   weaponScale: 2.00,
